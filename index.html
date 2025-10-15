@@ -1,25 +1,105 @@
-<main style="font-family:system-ui;padding:2rem;line-height:1.6;max-width:720px;margin:auto;text-align:center">
-  <h1 style="font-size:2.5rem;font-weight:700">
-    Hello Brentwood Web Designers 👋
-  </h1>
-  <p style="font-size:1.25rem;margin-top:1rem">
-    You ready to hack away???
-  </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Appointment Countdown</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: linear-gradient(to bottom right, #0d6efd, #6610f2);
+      color: white;
+      text-align: center;
+      padding: 1rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    #timer {
+      font-size: 3rem;
+      font-weight: bold;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Current Appointment Countdown</h1>
+  <div id="event-title">Loading...</div>
+  <div id="timer">--:--:--</div>
 
-  <p style="margin-top:2rem">
-    This site is deployed on <strong>Vercel</strong> using <em>Serverless Functions</em> — no installs, no setup, just creativity and code.
-  </p>
+  <script>
+    const ICS_URL = "https://your-calendar-url.ics"; // Replace with your iCal URL
 
-  <p style="margin-top:2rem">
-    Try your first API endpoint:  
-    <a href="/api/hello" style="font-weight:600;color:#0051ff">/api/hello</a>
-  </p>
+    async function fetchCalendar() {
+      try {
+        const res = await fetch(ICS_URL);
+        const text = await res.text();
+        return text;
+      } catch (e) {
+        document.getElementById('event-title').textContent = "Failed to load calendar";
+        throw e;
+      }
+    }
 
-  <hr style="margin:2rem 0">
+    function parseICS(icsText) {
+      const events = [];
+      const eventBlocks = icsText.split("BEGIN:VEVENT").slice(1);
+      for (const block of eventBlocks) {
+        const start = block.match(/DTSTART.*:(.*)/);
+        const end = block.match(/DTEND.*:(.*)/);
+        const summary = block.match(/SUMMARY:(.*)/);
+        if (start && end) {
+          events.push({
+            start: new Date(start[1].replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6')),
+            end: new Date(end[1].replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6')),
+            summary: summary ? summary[1] : "(No title)"
+          });
+        }
+      }
+      return events;
+    }
 
-  <p style="font-size:0.95rem;color:#555">
-    Tip: Set an environment variable named <code>GREETING_NAME</code> in  
-    <strong>Vercel → Project → Settings → Environment Variables</strong>, then redeploy.  
-    Your API will greet you personally next time 🚀
-  </p>
-</main>
+    function findCurrentEvent(events) {
+      const now = new Date();
+      return events.find(e => now >= e.start && now <= e.end);
+    }
+
+    function startCountdown(endTime) {
+      function updateTimer() {
+        const now = new Date();
+        const diff = endTime - now;
+        if (diff <= 0) {
+          document.getElementById('timer').textContent = "00:00:00";
+          return;
+        }
+        const hrs = String(Math.floor(diff / 3600000)).padStart(2, '0');
+        const mins = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+        const secs = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+        document.getElementById('timer').textContent = `${hrs}:${mins}:${secs}`;
+      }
+      updateTimer();
+      setInterval(updateTimer, 1000);
+    }
+
+    async function init() {
+      const icsText = await fetchCalendar();
+      const events = parseICS(icsText);
+      const current = findCurrentEvent(events);
+      if (current) {
+        document.getElementById('event-title').textContent = current.summary;
+        startCountdown(current.end);
+      } else {
+        document.getElementById('event-title').textContent = "No current appointment";
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
